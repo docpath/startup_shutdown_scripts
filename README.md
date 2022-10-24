@@ -13,7 +13,7 @@ The product that will be started, must be installed and activated successfully.
 ## Steps
 To configure and execute the script, follow the steps as indicated below:
 
-- Open the script with a text editor and add the path where the products are installed (`<product>Path keys`). Otherwise, the script will understand the product is not installed and will not try to start it. 
+- Open the script with a text editor and add the path where the products are installed (`<product>Path` keys). Otherwise, the script will understand the product is not installed and will not try to start it. 
 - If you want to use a JAVA JRE that is not the default in the system, modify the keys `<product_name>JREPath`. If these keys are empty, the script will execute "java -jar product", if not, it will execute the JRE in the selected path.
 Assign privilegies to execute the script if required.
 - Start it:
