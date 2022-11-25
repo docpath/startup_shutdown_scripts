@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Script version ###
-scriptVersion="1.0.3"
+scriptVersion="1.0.4"
 ######################
 
 echo "[Services Startup Script - v"$scriptVersion"]"
@@ -190,21 +190,19 @@ function stopController {
 
     cd $controllerPath >/dev/null 2>&1
     if [[ $? -ne 0 ]]; then echo "Controller is not installed or the path indicated is wrong."; return 1; fi
-    ./dpctrlsrv -q -fwdir.
+    ./dpctrlsrv -q -fwdir. >/dev/null &
 
-    if [[ $? -eq 1 ]]; then
-            ./dpctrlsrv -t -fwdir.
+    if [[ $? -eq 0 ]]; then
+            ./dpctrlsrv -t -fwdir. >/dev/null &
             for ((i=0; i<10; i++)); do
-                    ./dpctrlsrv -q -fwdir.
-                    if [[ $? -ne 1 ]]; then
+                    ./dpctrlsrv -q -fwdir. >/dev/null &
+                    if [[ $? -ne 0 ]]; then
                             sleep 1
-                    else
-                            echo "Controller is stopped."
-                            isControllerStarted=0
-                            break
                     fi
             done
     fi
+    echo "Controller is stopped."
+    isControllerStarted=0
 }
 
 function startLicenseServer {
