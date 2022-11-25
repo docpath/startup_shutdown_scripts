@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 rem ### Script version ###
-set scriptVersion=1.0.0
+set scriptVersion=1.0.2
 rem ######################
 
 set currentFolder=%cd%
@@ -16,16 +16,18 @@ set /a "isXFStarted=0"
 set /a "isSinclairStarted=0"
 set /a "isSinclairIndexStarted=0"
 set /a "isAimStarted=0"
+set /a "isInputAgentStarted=0"
 
-set licenseServerPath=
-set controllerPath=
-set resourceOnDemandPath=
-set cacheServicePath=
-set dgePath=
-set activeSpoolerPath=
-set sinclairPath=
-set sinclairIndexPath=
-set aimPath=
+set licenseServerPath=C:\DocPath\DocPath License\DocPath License Server\Bin
+set controllerPath=C:\DocPath\Controller Core Pack 6
+set resourceOnDemandPath=C:\DocPath\DocGeneration Expansion 6\ResourcesOnDemand\Bin
+set cacheServicePath=C:\DocPath\DocGeneration Expansion 6\CacheService\Bin
+set dgePath=C:\DocPath\DocGeneration Pack 6
+set activeSpoolerPath=C:\DocPath\ActiveSpooler Pack 2\ActiveSpooler\Bin
+set sinclairPath=C:\DocPath\Sinclair Pack 6\Sinclair
+set sinclairIndexPath=C:\DocPath\Sinclair Pack 6\SinclairIndex
+set aimPath=C:\DocPath\Access Identity Management\AccessIdentityManagement\Bin
+set inputAgentPath=C:\DocPath\InputAgent Pack 2\InputAgent\bin
 
 set licenseServerJREPath=
 set resourceOnDemandJREPath=
@@ -35,7 +37,7 @@ set activeSpoolerJREPath=
 set sinclairJREPath=
 set sinclairIndexJREPath=
 set aimJREPath=
-
+set inputAgentJREPath=
 
 echo [Services Startup Script - v"%scriptVersion%"]
 
@@ -109,6 +111,13 @@ if %errorlevel% NEQ 0 (
 	call :stopServices
 	cd %currentFolder% > NUL 2>&1
 	exit /B 5
+)
+call :startInputAgent
+if %errorlevel% NEQ 0 (
+	echo InputAgent cannot be started properly and will be stopped.
+	call :stopServices
+	cd %currentFolder% > NUL 2>&1
+	exit /B 11
 )
 
 cd %currentFolder%
@@ -655,6 +664,62 @@ goto :eof
 	set /a "isAimStarted=0"
 goto :eof
 
+:startInputAgent
+	
+	echo Starting InputAgent...
+	if not defined inputAgentPath (
+		echo InputAgent is not installed or the path indicated is wrong.
+		exit /B 1
+	)
+	cd %inputAgentPath% >NUL 2>&1
+	if %errorlevel% NEQ 0 (
+		echo InputAgent is not installed or the path indicated is wrong.
+		exit /B 1
+	)
+	
+	for /f %%c in ('curl localhost:1803/dpinputagent/status/isAlive -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
+	
+	if !http_code! NEQ 200 (
+		start "" "%inputAgentJREPath%javaw" -jar dpinputagent.war > NUL 2>&1
+		echo InputAgent is starting...
+	)
+	
+	for /l %%x in (1, 1, 20) do (
+		for /f %%c in ('curl localhost:1803/dpinputagent/status/isAlive -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
+		if !http_code! NEQ 200 (
+			timeout /t 1 /nobreak > NUL 2>&1
+		) else (
+			    echo InputAgent is started.
+			    set /a "isInputAgentStarted=1"
+				for /f "delims=" %%i in ('curl localhost:1803/dpinputagent/status/service-status -s') do set healthcheck_status=%%i
+				Set healthcheck_status=!healthcheck_status:}=!
+				Set healthcheck_status=!healthcheck_status:]=!
+				Set healthcheck_status=!healthcheck_status:,=!
+				Set healthcheck_status=!healthcheck_status:"=!
+				Set healthcheck_status=!healthcheck_status::=!
+				echo !healthcheck_status! | (findstr "statusrunning")  >nul 2>&1
+				if not errorlevel 1 (
+					echo InputAgent is correctly configured and ready.					
+					exit /B 0
+				) else (
+					echo InputAgent is not correctly configured or ready.
+					exit /B 1
+				)
+		)
+	)
+	
+	echo InputAgent is not started.
+	exit /B 1
+	
+goto :eof
+
+:stopInputAgent
+
+    curl localhost:1803/dpinputagent/shutdown -s -o nul
+	echo InputAgent is stopped.
+	set /a "isInputAgentStarted=0"
+goto :eof
+
 :stopServices
 
 	echo Stopping services...
@@ -668,7 +733,7 @@ goto :eof
 		call :stopActiveSpooler
 	)
     if !isResourceOnDemandStarted! EQU 1 (
-		call :stopartResourceOnDemand
+		call :stopResourceOnDemand
 	)
 	if !isCacheServiceStarted! EQU 1 (
 		call :stopCacheService
@@ -685,9 +750,12 @@ goto :eof
 	if !isSinclairIndexStarted! EQU 1 (
 		call :stopSinclairIndex
 	)
+	if !isInputAgentStarted! EQU 1 (
+		call :stopInputAgent
+	)
 	if !isLicenseServerStarted! EQU 1 (
 		call :stopLicenseServer
-	)
+	)	
 
 
 goto :eof
