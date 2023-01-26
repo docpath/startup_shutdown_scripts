@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 rem ### Script version ###
-set scriptVersion=1.0.2
+set scriptVersion=1.0.3
 rem ######################
 
 set currentFolder=%cd%
@@ -143,7 +143,7 @@ exit /B 0
 		echo Resources on Demand is starting...
 	)
 	for /l %%x in (1, 1, 20) do (
-		for /f %%c in ('curl localhost:1782/DpRoD/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
+		for /f %%c in ('curl localhost:1782/DpRoD/rest/check/rodstarted -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
 		if !http_code! NEQ 200 (
 			timeout /t 1 /nobreak > NUL 2>&1
 		) else (
@@ -199,7 +199,7 @@ goto :eof
 	)
 	
 	for /l %%x in (1, 1, 20) do (
-		for /f %%c in ('curl localhost:1781 -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
+		for /f %%c in ('curl localhost:1781/rest/check/cachestarted/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
 		if !http_code! NEQ 200 (
 			timeout /t 1 /nobreak > NUL 2>&1
 		) else (
