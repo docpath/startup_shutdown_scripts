@@ -19,3 +19,9 @@ Assign privilegies to execute the script if required.
 - Start it:
   - Type in Windows services_startup_windows.bat 
   - or type in Linux services_startup_windows.sh
+
+## Product Versions
+
+The following scripts are optimized for:
+- DocPath Cache Service 6.5.0
+- DocPath Resources on Demand 6.11.0
