@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Script version ###
-scriptVersion="1.0.4"
+scriptVersion="1.0.5"
 ######################
 
 echo "[Services Startup Script - v"$scriptVersion"]"
@@ -45,7 +45,7 @@ function startResourceOnDemand {
     fi
 
         for ((i=0; i<10; i++)); do
-            status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1782/DpRoD/)
+            status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1782/DpRoD/rest/check/rodstarted/)
                 if [[ "$status_code" -ne 200 ]]; then
                         sleep 1
                 else
@@ -85,7 +85,7 @@ function startCacheService {
     fi
 
         for ((i=0; i<10; i++)); do
-                status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1781/)
+                status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1781/rest/check/cachestarted/)
                 if [[ "$status_code" -ne 200 ]]; then
                         sleep 1
                 else
