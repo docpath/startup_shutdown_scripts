@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 rem ### Script version ###
-set scriptVersion=1.0.3
+set scriptVersion=1.0.4
 rem ######################
 
 set currentFolder=%cd%
@@ -17,6 +17,7 @@ set /a "isSinclairStarted=0"
 set /a "isSinclairIndexStarted=0"
 set /a "isAimStarted=0"
 set /a "isInputAgentStarted=0"
+set /a "isJobProcessorStarted=0"
 
 set licenseServerPath=C:\DocPath\DocPath License\DocPath License Server\Bin
 set controllerPath=C:\DocPath\Controller Core Pack 6
@@ -28,6 +29,7 @@ set sinclairPath=C:\DocPath\Sinclair Pack 6\Sinclair
 set sinclairIndexPath=C:\DocPath\Sinclair Pack 6\SinclairIndex
 set aimPath=C:\DocPath\Access Identity Management\AccessIdentityManagement\Bin
 set inputAgentPath=C:\DocPath\InputAgent Pack 2\InputAgent\bin
+set JobProcessorPath=>C:\DocPath\JobProcessor Pack 6\JobProcessor\Bin\
 
 set licenseServerJREPath=
 set resourceOnDemandJREPath=
@@ -38,6 +40,7 @@ set sinclairJREPath=
 set sinclairIndexJREPath=
 set aimJREPath=
 set inputAgentJREPath=
+set JobProcessorJREPath=
 
 echo [Services Startup Script - v"%scriptVersion%"]
 
@@ -118,6 +121,14 @@ if %errorlevel% NEQ 0 (
 	call :stopServices
 	cd %currentFolder% > NUL 2>&1
 	exit /B 11
+)
+
+call :startJobProcessor
+if %errorlevel% NEQ 0 (
+	echo JobProcessor cannot be started properly and will be stopped. 
+	call :stopServices
+	cd %currentFolder% > NUL 2>&1
+	exit /B 8
 )
 
 cd %currentFolder%
@@ -720,6 +731,64 @@ goto :eof
 	set /a "isInputAgentStarted=0"
 goto :eof
 
+:startJobProcessor
+	
+	echo Starting JobProcessor...
+	if not defined JobProcessorPath (
+		echo JobProcessor is not installed or the path indicated is wrong.
+		exit /B 1
+	)
+	cd /d %JobProcessorPath% >NUL 2>&1
+	if %errorlevel% NEQ 0 (
+		echo JobProcessor is not installed or the path indicated is wrong.
+		exit /B 1
+	)
+	
+	for /f %%c in ('curl localhost:1812/jobprocessor/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
+	
+	if !http_code! NEQ 200 (
+		echo JobProcessor is starting...
+		start "" "%JobProcessorJREPath%javaw" -jar jobprocessor.war > NUL 2>&1
+	)
+	for /l %%x in (1, 1, 20) do (
+		for /f %%c in ('curl localhost:1812/jobprocessor/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
+		if !http_code! NEQ 200 (
+			timeout /t 1 /nobreak > NUL 2>&1
+		) else (
+			echo JobProcessor is started.
+			set /a "isJobProcessorStarted=1"
+			for /f "delims=" %%i in ('curl localhost:1812/jobprocessor/webresources/status/service-status -s') do set healthcheck_status=%%i
+				Set healthcheck_status=!healthcheck_status:}=!
+				Set healthcheck_status=!healthcheck_status:]=!
+				Set healthcheck_status=!healthcheck_status:,=!
+				Set healthcheck_status=!healthcheck_status:"=!
+				Set healthcheck_status=!healthcheck_status::=!
+				echo !healthcheck_status! | (findstr "statusrunning")  >nul 2>&1
+				if not errorlevel 1 (
+					echo JobProcessor is correctly configured and ready.					
+					exit /B 0
+				) else (
+					echo JobProcessor is not correctly configured or ready.
+					exit /B 1
+				)
+			exit /B 0
+				
+		)
+	)
+	
+	echo JobProcessor is not started.
+	exit /B 1
+	
+goto :eof
+
+:stopJobProcessor
+
+	cd /d %JobProcessorPath% >NUL 2>&1
+    "%JobProcessorJREPath%javaw" -jar jobprocessor.war -shutdown
+	echo JobProcessor is stopped.
+	set /a "isJobProcessorStarted=0"
+goto :eof
+
 :stopServices
 
 	echo Stopping services...
@@ -756,7 +825,9 @@ goto :eof
 	if !isLicenseServerStarted! EQU 1 (
 		call :stopLicenseServer
 	)	
-
+	if !isJobProcessorStarted! EQU 1 (
+		call :stopJobProcessor
+	)
 
 goto :eof
 
