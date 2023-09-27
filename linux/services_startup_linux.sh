@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Script version ###
-scriptVersion="1.0.5"
+scriptVersion="1.0.6"
 ######################
 
 echo "[Services Startup Script - v"$scriptVersion"]"
@@ -17,6 +17,7 @@ isInputAgentStarted=0
 isDocManagerServiceStarted=0
 isDocManagerWebToolStarted=0
 isDocManagerContentServerStarted=0
+isJobProcessorStarted=0
 
 licenseServerPath=/usr/local/docpath/licenseserver/licenseserver/Bin
 aimPath="/usr/local/docpath/Access Identity Management/AccessIdentityManagement/Bin"
@@ -28,6 +29,7 @@ activeSpoolerPath=/usr/local/docpath/activespoolerpack/activespooler/Bin
 inputAgentPath=/usr/local/docpath/inputagentpack2/inputagent/bin
 docManagerServicePath=/usr/local/docpath/docmanagerarpack6/service
 docManagerWebToolPath=/usr/local/docpath/docmanagerarpack6/webtool
+jobProcessorPath=/usr/local/docpath/jobprocessorpack6/JobProcessor/Bin/
 
 expected_status='isValid":true}],"name":"General_Status"'
 expected_status2='"status":"running"'
@@ -487,6 +489,54 @@ function stopAim() {
         isAimStarted=0
 }
 
+function startJobProcessor {
+        echo ""
+        echo "Starting JobProcessor..."
+        cd $jobProcessorPath >/dev/null 2>&1
+        if [[ $? -ne 0 ]]; then echo "JobProcessor is not installed or the path indicated is wrong."; return 1; fi
+
+        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1812/)
+        if [[ "$status_code" -ne 200 ]]; then
+        nohup java -jar jobprocessor.war >/dev/null 2>&1 &
+        echo "JobProcessor is starting..."
+    fi
+
+        for ((i=0; i<300; i++)); do
+                status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1812/jobprocessor/webresources/status/service-status/)
+                if [[ "$status_code" -ne 200 ]]; then
+                        sleep 1
+                else
+                        echo "JobProcessor is started."
+                        isJobProcessorStarted=1
+                        healthcheck_status=$(curl --silent localhost:1812/jobprocessor/webresources/status/service-status/)
+                        if grep -q "$expected_status2" <<< "$healthcheck_status"; then
+                                echo "JobProcessor is correctly configured and ready."
+                                return 0;
+                        else
+                                echo "JobProcessor is not correctly configured or ready."
+                                return 1;
+
+                        fi
+                fi
+        done
+
+        echo "JobProcessor is not started."
+        return 1;
+}
+
+function stopJobProcessor {
+
+    echo "JobProcessor is stopping."
+	for ((i=0; i<300; i++)); do
+    status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1812/jobprocessor/Shutdown)
+	if [[ "$status_code" -ne 000 ]]; then
+			sleep 1
+	fi
+	done
+    echo "JobProcessor is stopped."
+    isJobProcessorStarted=0
+}
+
 function stopServices {
         echo ""
         echo "Stopping services..."
@@ -501,6 +551,7 @@ function stopServices {
         if [ "$isDocManagerWebToolStarted" -eq 1 ]; then stopDocManagerWebTool; fi
         if [ "$isDocManagerContentServerStarted" -eq 1 ]; then stopDocManagerContentServer; fi
         if [ "$isLicenseServerStarted" -eq 1 ]; then stopLicenseServer; fi
+        if [ "$isJobProcessorStarted" -eq 1 ]; then stopJobProcessor; fi
         echo ""
 }
 
@@ -527,3 +578,5 @@ startDocManagerWebTool
 if [[ $? -ne 0 ]]; then echo "DocManager WebTool cannot be started properly and will be stopped."; stopServices; exit 9; fi
 startDocManagerContentServer
 if [[ $? -ne 0 ]]; then echo "DocManager Content Server cannot be started properly and will be stopped."; stopServices; exit 11; fi
+startJobProcessor
+if [[ $? -ne 0 ]]; then echo "JobProcessor cannot be started properly and will be stopped."; stopServices; exit 12; fi
