@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Script version ###
-scriptVersion="1.0.0"
+scriptVersion="1.0.1"
 ######################
 
 echo "[Services Shutdown Script - v"$scriptVersion"]"
@@ -17,6 +17,7 @@ isInputAgentStarted=1
 isDocManagerServiceStarted=1
 isDocManagerWebToolStarted=1
 isDocManagerContentServerStarted=1
+isJobProcessorStarted=1
 
 licenseServerPath=/usr/local/docpath/licenseserver/licenseserver/Bin
 controllerPath=/usr/local/docpath/controllercorepack
@@ -181,6 +182,16 @@ function stopAim() {
 	isAimStarted=0
 }
 
+function stopJobProcessor() {
+
+	status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1812/jobprocessor/)
+	if [[ "$status_code" -eq 200 ]]; then
+		curl -o /dev/null --silent localhost:1812/jobprocessor/Shutdown
+	fi
+
+	echo "JobProcessor is stopped."
+	isJobProcessorStarted=0
+}
 
 echo "Stopping services..."
 if [ "$isAimStarted" -eq 1 ]; then stopAim; fi
@@ -194,4 +205,5 @@ if [ "$isDocManagerServiceStarted" -eq 1 ]; then stopDocManagerService; fi
 if [ "$isDocManagerWebToolStarted" -eq 1 ]; then stopDocManagerWebTool; fi
 if [ "$isDocManagerContentServerStarted" -eq 1 ]; then stopDocManagerContentServer; fi
 if [ "$isLicenseServerStarted" -eq 1 ]; then stopLicenseServer; fi
+if [ "$isJobProcessorStarted" -eq 1 ]; then stopJobProcessor; fi
 echo ""
