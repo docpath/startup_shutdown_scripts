@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 rem ### Script version ###
-set scriptVersion=1.0.1
+set scriptVersion=1.0.2
 rem ######################
 
 set currentFolder=%cd%
@@ -17,7 +17,7 @@ set /a "isSinclairStarted=1"
 set /a "isSinclairIndexStarted=1"
 set /a "isAimStarted=1"
 set /a "isInputAgentStarted=1"
-
+set /a "isJobProcessorStarted=1"
 
 set sinclairPath=C:\DocPath\Sinclair Pack 6\Sinclair
 set sinclairIndexPath=C:\DocPath\Sinclair Pack 6\SinclairIndex
@@ -65,7 +65,9 @@ echo Stopping services...
 	if !isLicenseServerStarted! EQU 1 (
 		call :stopLicenseServer
 	)	
-
+	if !isJobProcessorStarted! EQU 1 (
+		call :stopJobProcessor
+	)
 
 cd %currentFolder%
 exit /B 0
@@ -266,5 +268,16 @@ for /F "tokens=3 delims=: " %%H in ('sc query "dpctrlsrv6" ^| findstr "        S
 )
 goto :eof
 
+:stopJobProcessor
 
+	echo Stopping JobProcessor..
+	for /f %%c in ('curl localhost:1812/jobprocessor/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
+	
+	if !http_code! EQU 200 (
+		curl localhost:1812/jobprocessor/Shutdown -s -o nul
+	)
+	
+	echo JobProcessor is stopped.
+	set /a "isJobProcessorStarted=0"
+goto :eof
 
