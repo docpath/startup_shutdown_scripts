@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Script version ###
-scriptVersion="1.0.6"
+scriptVersion="1.0.8"
 ######################
 
 echo "[Services Startup Script - v"$scriptVersion"]"
@@ -18,6 +18,8 @@ isDocManagerServiceStarted=0
 isDocManagerWebToolStarted=0
 isDocManagerContentServerStarted=0
 isJobProcessorStarted=0
+isSinclairStarted=0
+isSinclairIndexStarted=0
 
 licenseServerPath=/usr/local/docpath/licenseserver/licenseserver/Bin
 aimPath="/usr/local/docpath/Access Identity Management/AccessIdentityManagement/Bin"
@@ -30,9 +32,41 @@ inputAgentPath=/usr/local/docpath/inputagentpack2/inputagent/bin
 docManagerServicePath=/usr/local/docpath/docmanagerarpack6/service
 docManagerWebToolPath=/usr/local/docpath/docmanagerarpack6/webtool
 jobProcessorPath=/usr/local/docpath/jobprocessorpack6/JobProcessor/Bin/
+sinclairPath=/usr/local/docpath/sinclairpack6/sinclair/
+sinclairIndexPath=/usr/local/docpath/sinclairpack6/sinclairindex/
 
+#The JRE paths must end with the character '/'
+licenseServerJREPath=
+resourceOnDemandJREPath=
+cacheServiceJREPath=
+dgeJREPath=
+activeSpoolerJREPath=
+sinclairJREPath=
+sinclairIndexJREPath=
+aimJREPath=
+inputAgentJREPath=
+JobProcessorJREPath=
+docManagerServiceJREPath=
+docManagerWebToolJREPath=
+
+user=
 expected_status='isValid":true}],"name":"General_Status"'
 expected_status2='"status":"running"'
+
+function checkUser {
+
+  if [ -z "$user" ]; then
+	return 0;
+  else
+    loggedInUser=$(whoami)
+    if [ "$user" != "$loggedInUser" ]; then
+	   echo "The logged in user ($loggedInUser) is different than the script user ($user)"
+	   return 1;
+	else
+	   return 0;
+	fi
+  fi
+}
 
 function startResourceOnDemand {
         echo ""
@@ -42,7 +76,7 @@ function startResourceOnDemand {
 
         status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1782/DpRoD/)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar dprodservice.war >/dev/null 2>&1 &
+        nohup ${resourceOnDemandJREPath}java -jar dprodservice.war >/dev/null 2>&1 &
         echo "Resources on Demand is starting..."
     fi
 
@@ -82,7 +116,7 @@ function startCacheService {
 
         status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1781/)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar dpcacheservice.war >/dev/null 2>&1 &
+        nohup ${cacheServiceJREPath}java -jar dpcacheservice.war >/dev/null 2>&1 &
         echo "Cache Service is starting..."
     fi
 
@@ -124,7 +158,7 @@ function startDge {
 
         status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:8084/dge/)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar dge.war >/dev/null 2>&1 &
+        nohup ${dgeJREPath}java -jar dge.war >/dev/null 2>&1 &
         echo "DGE is starting..."
   fi
 
@@ -213,7 +247,7 @@ function startLicenseServer {
 
     cd $licenseServerPath >/dev/null 2>&1
     if [[ $? -ne 0 ]]; then echo "License Server is not installed or the path indicated is wrong."; return 1; fi
-    java -jar dplicenseserver.jar -query >/dev/null
+    ${licenseServerJREPath}java -jar dplicenseserver.jar -query >/dev/null
 
     if [[ $? -ne 0 ]]; then
         echo "License Server is started."
@@ -221,10 +255,10 @@ function startLicenseServer {
     fi
 
     if [ "$isLicenseServerStarted" -ne 1 ]; then
-            java -jar dplicenseserver.jar -start >/dev/null &
+            ${licenseServerJREPath}java -jar dplicenseserver.jar -start >/dev/null &
             echo "License Server is starting..."
             for ((i=0; i<10; i++)); do
-                    java -jar dplicenseserver.jar -query >/dev/null
+                    ${licenseServerJREPath}java -jar dplicenseserver.jar -query >/dev/null
                     if [[ $? -eq 0 ]]; then
                             sleep 1
                     else
@@ -241,12 +275,12 @@ function startLicenseServer {
 function stopLicenseServer {
 
     cd $licenseServerPath >/dev/null 2>&1
-    java -jar dplicenseserver.jar -query >/dev/null
+    ${licenseServerJREPath}java -jar dplicenseserver.jar -query >/dev/null
 
     if [[ $? -ne 0 ]]; then
-            java -jar dplicenseserver.jar -stop >/dev/null &
+            ${licenseServerJREPath}java -jar dplicenseserver.jar -stop >/dev/null &
             for ((i=0; i<10; i++)); do
-                    java -jar dplicenseserver.jar -query >/dev/null
+                    ${licenseServerJREPath}java -jar dplicenseserver.jar -query >/dev/null
                     if [[ $? -ne 0 ]]; then
                             sleep 1
                     else
@@ -267,9 +301,9 @@ function startActiveSpooler {
 
         status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:8085/dpactivespooler/)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar dpactivespooler.war >/dev/null 2>&1 &
-        echo "ActiveSpooler is starting..."
-    fi
+        	nohup ${activeSpoolerJREPath}java -jar dpactivespooler.war >/dev/null 2>&1 &
+       	 	echo "ActiveSpooler is starting..."
+    	fi
 
         for ((i=0; i<30; i++)); do
             status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:8085/dpactivespooler/)
@@ -307,7 +341,7 @@ function startInputAgent {
 
         status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1803/dpinputagent/status/isAlive)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar dpinputagent.war >/dev/null 2>&1 &
+        nohup ${inputAgentJREPath}java -jar dpinputagent.war >/dev/null 2>&1 &
         echo "InputAgent is starting..."
     fi
 
@@ -348,7 +382,7 @@ function startDocManagerService {
 
         status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1785/dpdocarsrv/status/isAlive)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar dpdocarsrv.war >/dev/null 2>&1 &
+        nohup ${docManagerServiceJREPath}java -jar dpdocarsrv.war >/dev/null 2>&1 &
         echo "DocManager Service is starting..."
     fi
 
@@ -423,7 +457,7 @@ function startDocManagerWebTool {
 
         status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1786/dpdocarwebtool/)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar dpdocarwebtool.war >/dev/null 2>&1 &
+        nohup ${docManagerWebToolJREPath}java -jar dpdocarwebtool.war >/dev/null 2>&1 &
         echo "DocManager WebTool is starting..."
     fi
 
@@ -457,7 +491,7 @@ function startAim {
 
         status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:8080/aim/ping/)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar aim.war >/dev/null 2>&1 &
+        nohup ${aimJREPath}java -jar aim.war >/dev/null 2>&1 &
         echo "AIM is starting..."
     fi
 
@@ -495,13 +529,13 @@ function startJobProcessor {
         cd $jobProcessorPath >/dev/null 2>&1
         if [[ $? -ne 0 ]]; then echo "JobProcessor is not installed or the path indicated is wrong."; return 1; fi
 
-        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1812/)
+        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1812/jobprocessor/webresources/status/service-status/)
         if [[ "$status_code" -ne 200 ]]; then
-        nohup java -jar jobprocessor.war >/dev/null 2>&1 &
+        nohup ${JobProcessorJREPath}java -jar jobprocessor.war >/dev/null 2>&1 &
         echo "JobProcessor is starting..."
     fi
 
-        for ((i=0; i<300; i++)); do
+        for ((i=0; i<60; i++)); do
                 status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1812/jobprocessor/webresources/status/service-status/)
                 if [[ "$status_code" -ne 200 ]]; then
                         sleep 1
@@ -527,7 +561,7 @@ function startJobProcessor {
 function stopJobProcessor {
 
     echo "JobProcessor is stopping."
-	for ((i=0; i<300; i++)); do
+	for ((i=0; i<60; i++)); do
     status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1812/jobprocessor/Shutdown)
 	if [[ "$status_code" -ne 000 ]]; then
 			sleep 1
@@ -535,6 +569,102 @@ function stopJobProcessor {
 	done
     echo "JobProcessor is stopped."
     isJobProcessorStarted=0
+}
+
+function startSinclair {
+        echo ""
+        echo "Starting Sinclair..."
+        cd $sinclairPath >/dev/null 2>&1
+        if [[ $? -ne 0 ]]; then echo "Sinclair is not installed or the path indicated is wrong."; return 1; fi
+
+        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1806/)
+        if [[ "$status_code" -ne 200 ]]; then
+        nohup ${sinclairJREPath}java -jar dpsinclair.war >/dev/null 2>&1 &
+        echo "Sinclair is starting..."
+    fi
+
+        for ((i=0; i<60; i++)); do
+                status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1806/dpsinclair/status/service-status/)
+                if [[ "$status_code" -ne 503 && "$status_code" -ne 200 ]]; then
+                        sleep 1
+                else
+                        echo "Sinclair is started."
+                        isSinclairStarted=1
+                        healthcheck_status=$(curl --silent localhost:1806/dpsinclair/status/service-status/)
+                        if grep -q "$expected_status2" <<< "$healthcheck_status"; then
+                                echo "Sinclair is correctly configured and ready."
+                                return 0;
+                        else
+                                echo "Sinclair is not correctly configured or ready."
+                                return 1;
+
+                        fi
+                fi
+        done
+
+        echo "Sinclair is not started."
+        return 1;
+}
+
+function stopSinclair {
+
+    echo "Sinclair is stopping."
+	for ((i=0; i<60; i++)); do
+    status_code=$(curl -X POST -o /dev/null -w "%{http_code}" --silent localhost:1806/dpsinclair/actuator/shutdown)
+	if [[ "$status_code" -ne 000 ]]; then
+			sleep 1
+	fi
+	done
+    echo "Sinclair is stopped."
+    isSinclairStarted=0
+}
+
+function stopSinclairIndex {
+	
+    echo "Sinclair Index is stopping."
+	for ((i=0; i<60; i++)); do
+    status_code=$(curl -X POST -o /dev/null -w "%{http_code}" --silent localhost:1807/dpsinclairindex/actuator/shutdown)
+	if [[ "$status_code" -ne 000 ]]; then
+			sleep 1
+	fi
+	done
+    echo "Sinclair Index is stopped."
+    isSinclairIndexStarted=0
+}
+
+function startSinclairIndex {
+        echo ""
+        echo "Starting Sinclair Index..."
+        cd $sinclairIndexPath >/dev/null 2>&1
+        if [[ $? -ne 0 ]]; then echo "Sinclair Index is not installed or the path indicated is wrong."; return 1; fi
+
+        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1807/)
+        if [[ "$status_code" -ne 200 ]]; then
+        nohup ${sinclairIndexJREPath}java -jar dpsinclairindex.war >/dev/null 2>&1 &
+        echo "Sinclair Index is starting..."
+    fi
+
+        for ((i=0; i<60; i++)); do
+                status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1807/dpsinclairindex/status/service-status/)
+                if [[ "$status_code" -ne 503 && "$status_code" -ne 200 ]]; then
+                        sleep 1
+                else
+                        echo "Sinclair is started."
+                        isSinclairIndexStarted=1
+                        healthcheck_status=$(curl --silent localhost:1807/dpsinclairindex/status/service-status/)
+                        if grep -q "$expected_status2" <<< "$healthcheck_status"; then
+                                echo "Sinclair Index is correctly configured and ready."
+                                return 0;
+                        else
+                                echo "Sinclair Index is not correctly configured or ready."
+                                return 1;
+
+                        fi
+                fi
+        done
+
+        echo "Sinclair Index is not started."
+        return 1;
 }
 
 function stopServices {
@@ -552,8 +682,13 @@ function stopServices {
         if [ "$isDocManagerContentServerStarted" -eq 1 ]; then stopDocManagerContentServer; fi
         if [ "$isLicenseServerStarted" -eq 1 ]; then stopLicenseServer; fi
         if [ "$isJobProcessorStarted" -eq 1 ]; then stopJobProcessor; fi
+	if [ "$isSinclairStarted" -eq 1 ]; then stopSinclair; fi
+	if [ "$isSinclairIndexStarted" -eq 1 ]; then stopSinclairIndex; fi
         echo ""
 }
+
+checkUser
+if [[ $? -ne 0 ]]; then echo "Startup script cannot be started because the user is not correctly configured."; exit 15; fi
 
 echo "Starting services..."
 startLicenseServer
@@ -580,3 +715,7 @@ startDocManagerContentServer
 if [[ $? -ne 0 ]]; then echo "DocManager Content Server cannot be started properly and will be stopped."; stopServices; exit 11; fi
 startJobProcessor
 if [[ $? -ne 0 ]]; then echo "JobProcessor cannot be started properly and will be stopped."; stopServices; exit 12; fi
+startSinclair
+if [[ $? -ne 0 ]]; then echo "Sinclair cannot be started properly and will be stopped."; stopServices; exit 13; fi
+startSinclairIndex
+if [[ $? -ne 0 ]]; then echo "Sinclair Index cannot be started properly and will be stopped."; stopServices; exit 14; fi
