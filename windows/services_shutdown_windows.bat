@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 rem ### Script version ###
-set scriptVersion=1.0.2
+set scriptVersion=1.0.3
 rem ######################
 
 set currentFolder=%cd%
@@ -64,7 +64,7 @@ echo Stopping services...
 	)
 	if !isLicenseServerStarted! EQU 1 (
 		call :stopLicenseServer
-	)	
+	)
 	if !isJobProcessorStarted! EQU 1 (
 		call :stopJobProcessor
 	)
@@ -205,8 +205,8 @@ goto :eof
 	for /f %%c in ('curl localhost:1806/dpsinclair/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
 	
 	if !http_code! EQU 200 (
-		cd %sinclairPath% >NUL 2>&1
-        "%sinclairJREPath%javaw" -jar dpsinclair.war -shutdown
+		cd /d %sinclairPath% >NUL 2>&1
+        start "" "%sinclairJREPath%javaw" -jar dpsinclair.war -shutdown
 	)
 	
 	echo Sinclair is stopped.
@@ -220,8 +220,8 @@ goto :eof
 	for /f %%c in ('curl localhost:1807/dpsinclairindex/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
 	
 	if !http_code! EQU 200 (
-		cd %sinclairIndexPath% >NUL 2>&1
-		"%sinclairIndexJREPath%javaw" -jar dpsinclairindex.war -shutdown	
+		cd /d %sinclairIndexPath% >NUL 2>&1
+		start "" "%sinclairIndexJREPath%javaw" -jar dpsinclairindex.war -shutdown	
 	)
     
 	echo Sinclair Index is stopped.
