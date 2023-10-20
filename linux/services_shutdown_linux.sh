@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Script version ###
-scriptVersion="1.0.1"
+scriptVersion="1.0.2"
 ######################
 
 echo "[Services Shutdown Script - v"$scriptVersion"]"
@@ -18,14 +18,34 @@ isDocManagerServiceStarted=1
 isDocManagerWebToolStarted=1
 isDocManagerContentServerStarted=1
 isJobProcessorStarted=1
+isSinclairIndexStarted=1
+isSinclairStarted=1
 
 licenseServerPath=/usr/local/docpath/licenseserver/licenseserver/Bin
 controllerPath=/usr/local/docpath/controllercorepack
 docManagerServicePath=/usr/local/docpath/docmanagerarpack6/service
 
+#The JRE paths must end with the character '/'
+licenseServerJREPath=
+
+user=
 expected_status='isValid":true}],"name":"General_Status"'
 expected_status2='"status":"running"'
 
+function checkUser {
+
+  if [ -z "$user" ]; then
+	return 0;
+  else
+    loggedInUser=$(whoami)
+    if [ "$user" != "$loggedInUser" ]; then
+	   echo "The logged in user ($loggedInUser) is different than the script user ($user)"
+	   return 1;
+	else
+	   return 0;
+	fi
+  fi
+}
 
 function stopResourceOnDemand() {
 
@@ -89,12 +109,12 @@ function stopLicenseServer {
 
 	cd $licenseServerPath >/dev/null 2>&1
 	if [[ $? -ne 0 ]]; then echo "License Server is not installed or the path indicated is wrong."; return 1; fi
-	java -jar dplicenseserver.jar -query >/dev/null
+	${licenseServerJREPath}java -jar dplicenseserver.jar -query >/dev/null
 
 	if [[ $? -ne 0 ]]; then
-		java -jar dplicenseserver.jar -stop >/dev/null &
+		${licenseServerJREPath}java -jar dplicenseserver.jar -stop >/dev/null &
 		for ((i=0; i<10; i++)); do
-			java -jar dplicenseserver.jar -query >/dev/null
+			${licenseServerJREPath}java -jar dplicenseserver.jar -query >/dev/null
 			if [[ $? -ne 0 ]]; then
 				sleep 1                   
 			fi
@@ -193,6 +213,31 @@ function stopJobProcessor() {
 	isJobProcessorStarted=0
 }
 
+function stopSinclair() {
+	 
+	status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1806/dpsinclair/)
+	if [[ "$status_code" -eq 200 ]]; then
+		curl -X POST -o /dev/null --silent localhost:1806/dpsinclair/actuator/shutdown
+	fi
+
+	echo "Sinclair is stopped."
+	isSinclairStarted=0
+}
+
+function stopSinclairIndex() {
+	 
+	status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1807/dpsinclairindex/)
+	if [[ "$status_code" -eq 200 ]]; then
+		curl -X POST -o /dev/null --silent localhost:1807/dpsinclairindex/actuator/shutdown
+	fi
+
+	echo "Sinclair Index is stopped."
+	isSinclairIndexStarted=0
+}
+
+checkUser
+if [[ $? -ne 0 ]]; then echo "Shutdown script cannot be started because the user is not correctly configured."; exit 15; fi
+
 echo "Stopping services..."
 if [ "$isAimStarted" -eq 1 ]; then stopAim; fi
 if [ "$isControllerStarted" -eq 1 ]; then stopController; fi
@@ -206,4 +251,6 @@ if [ "$isDocManagerWebToolStarted" -eq 1 ]; then stopDocManagerWebTool; fi
 if [ "$isDocManagerContentServerStarted" -eq 1 ]; then stopDocManagerContentServer; fi
 if [ "$isLicenseServerStarted" -eq 1 ]; then stopLicenseServer; fi
 if [ "$isJobProcessorStarted" -eq 1 ]; then stopJobProcessor; fi
+if [ "$isSinclairStarted" -eq 1 ]; then stopSinclair; fi
+if [ "$isSinclairIndexStarted" -eq 1 ]; then stopSinclairIndex; fi
 echo ""
