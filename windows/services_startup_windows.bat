@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 rem ### Script version ###
-set scriptVersion=1.0.5
+set scriptVersion=1.0.6
 rem ######################
 
 set currentFolder=%cd%
@@ -555,10 +555,10 @@ goto :eof
 	for /l %%x in (1, 1, 20) do (
 		for /f %%c in ('curl localhost:1806/dpsinclair/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
 		if !http_code! NEQ 200 (
-			timeout /t 1 /nobreak > NUL 2>&1
-		) else if "!http_code!" NEQ 503 (
-			timeout /t 1 /nobreak > NUL 2>&1
-		) else (
+			if !http_code! NEQ 503 (
+				timeout /t 1 /nobreak > NUL 2>&1
+			)
+		)  else (
 			echo Sinclair is started.
 			set /a "isSinclairStarted=1"
 			for /f "delims=" %%i in ('curl localhost:1806/dpsinclair/status/service-status -s') do set healthcheck_status=%%i
@@ -587,9 +587,8 @@ goto :eof
 
 :stopSinclair
 
-	cd /d %sinclairPath% >NUL 2>&1
-    "%sinclairJREPath%javaw" -jar dpsinclair.war -shutdown
-	echo Sinclair is stopped.
+	curl -X POST localhost:1806/dpsinclair/actuator/shutdown -s -o nul
+	echo Sinclair stop requested.
 	set /a "isSinclairStarted=0"
 goto :eof
 	
@@ -615,9 +614,9 @@ goto :eof
 	for /l %%x in (1, 1, 20) do (
 		for /f %%c in ('curl localhost:1807/dpsinclairindex/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
 		if !http_code! NEQ 200 (
-			timeout /t 1 /nobreak > NUL 2>&1
-		) else if "!http_code!" NEQ 503 (
-			timeout /t 1 /nobreak > NUL 2>&1
+			if !http_code! NEQ 503 (
+				timeout /t 1 /nobreak > NUL 2>&1
+			)
 		) else (
 			echo Sinclair Index is started.
 			set /a "isSinclairIndexStarted=1"
@@ -647,9 +646,8 @@ goto :eof
 
 :stopSinclairIndex
 
-    cd /d %sinclairIndexPath% >NUL 2>&1
-    "%sinclairIndexJREPath%javaw" -jar dpsinclairindex.war -shutdown	
-	echo Sinclair Index is stopped.
+    	curl -X POST localhost:1807/dpsinclairindex/actuator/shutdown -s -o nul
+	echo Sinclair Index stop requested.
 	set /a "isSinclairIndexStarted=0"
 goto :eof
 
@@ -818,7 +816,7 @@ goto :eof
 
 	cd /d %JobProcessorPath% >NUL 2>&1
     "%JobProcessorJREPath%javaw" -jar jobprocessor.war -shutdown
-	echo JobProcessor is stopped.
+	echo JobProcessor is requested.
 	set /a "isJobProcessorStarted=0"
 goto :eof
 
