@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Script version ###
-scriptVersion="1.0.8"
+scriptVersion="1.0.9"
 ######################
 
 echo "[Services Startup Script - v"$scriptVersion"]"
@@ -577,7 +577,7 @@ function startSinclair {
         cd $sinclairPath >/dev/null 2>&1
         if [[ $? -ne 0 ]]; then echo "Sinclair is not installed or the path indicated is wrong."; return 1; fi
 
-        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1806/)
+        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1806/dpsinclair/login)
         if [[ "$status_code" -ne 200 ]]; then
         nohup ${sinclairJREPath}java -jar dpsinclair.war >/dev/null 2>&1 &
         echo "Sinclair is starting..."
@@ -608,28 +608,53 @@ function startSinclair {
 
 function stopSinclair {
 
-    echo "Sinclair is stopping."
-	for ((i=0; i<60; i++)); do
-    status_code=$(curl -X POST -o /dev/null -w "%{http_code}" --silent localhost:1806/dpsinclair/actuator/shutdown)
-	if [[ "$status_code" -ne 000 ]]; then
+	echo "Sinclair is stopping."
+	
+	MAX_WAIT_ITERATIONS=60
+	i=0
+
+	for ((; $i<$MAX_WAIT_ITERATIONS; i++)); do
+		status_code=$(curl -X POST -o /dev/null -w "%{http_code}" --silent localhost:1806/dpsinclair/actuator/shutdown)
+		if [[ "$status_code" -ne 000 ]]; then
 			sleep 1
-	fi
+		else
+			break
+		fi
 	done
-    echo "Sinclair is stopped."
-    isSinclairStarted=0
+
+	if [[ $i < $MAX_WAIT_ITERATIONS ]]; then
+		echo "Sinclair is stopped."
+		isSinclairStarted=0
+	else
+		echo "Sinclair shutdown has been requested but it cannot be ensured that it has been performed successfully (the timeout has expired and Sinclair is still active)."
+		isSinclairStarted=-1
+	fi
 }
 
 function stopSinclairIndex {
 	
-    echo "Sinclair Index is stopping."
-	for ((i=0; i<60; i++)); do
-    status_code=$(curl -X POST -o /dev/null -w "%{http_code}" --silent localhost:1807/dpsinclairindex/actuator/shutdown)
-	if [[ "$status_code" -ne 000 ]]; then
+	echo "Sinclair Index is stopping."
+	
+	MAX_WAIT_ITERATIONS=60
+	i=0
+
+	for ((; $i<$MAX_WAIT_ITERATIONS; i++)); do
+		status_code=$(curl -X POST -o /dev/null -w "%{http_code}" --silent localhost:1807/dpsinclairindex/actuator/shutdown)
+		if [[ "$status_code" -ne 000 ]]; then
 			sleep 1
-	fi
+		else
+			break
+		fi
 	done
-    echo "Sinclair Index is stopped."
-    isSinclairIndexStarted=0
+
+	if [[ $i < $MAX_WAIT_ITERATIONS ]]; then
+		echo "Sinclair Index is stopped."
+		isSinclairIndexStarted=0
+	else
+		echo "Sinclair Index shutdown has been requested but it cannot be ensured that it has been performed successfully (the timeout has expired and Sinclair Index is still active)."
+		isSinclairIndexStarted=-1
+	fi
+}
 }
 
 function startSinclairIndex {
@@ -638,7 +663,7 @@ function startSinclairIndex {
         cd $sinclairIndexPath >/dev/null 2>&1
         if [[ $? -ne 0 ]]; then echo "Sinclair Index is not installed or the path indicated is wrong."; return 1; fi
 
-        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1807/)
+        status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1807/dpsinclairindex/)
         if [[ "$status_code" -ne 200 ]]; then
         nohup ${sinclairIndexJREPath}java -jar dpsinclairindex.war >/dev/null 2>&1 &
         echo "Sinclair Index is starting..."
@@ -649,7 +674,7 @@ function startSinclairIndex {
                 if [[ "$status_code" -ne 503 && "$status_code" -ne 200 ]]; then
                         sleep 1
                 else
-                        echo "Sinclair is started."
+                        echo "Sinclair Index is started."
                         isSinclairIndexStarted=1
                         healthcheck_status=$(curl --silent localhost:1807/dpsinclairindex/status/service-status/)
                         if grep -q "$expected_status2" <<< "$healthcheck_status"; then
