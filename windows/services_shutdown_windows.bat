@@ -205,8 +205,7 @@ goto :eof
 	for /f %%c in ('curl localhost:1806/dpsinclair/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
 	
 	if !http_code! EQU 200 (
-		cd /d %sinclairPath% >NUL 2>&1
-        start "" "%sinclairJREPath%javaw" -jar dpsinclair.war -shutdown
+		curl -X POST localhost:1806/dpsinclair/actuator/shutdown -s -o nul
 	)
 	
 	echo Sinclair is stopped.
@@ -220,8 +219,7 @@ goto :eof
 	for /f %%c in ('curl localhost:1807/dpsinclairindex/ -s -w "%%{http_code}\r\n" -o nul') do set /a "http_code=%%c"
 	
 	if !http_code! EQU 200 (
-		cd /d %sinclairIndexPath% >NUL 2>&1
-		start "" "%sinclairIndexJREPath%javaw" -jar dpsinclairindex.war -shutdown	
+		curl -X POST localhost:1807/dpsinclairindex/actuator/shutdown -s -o nul	
 	)
     
 	echo Sinclair Index is stopped.
