@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Script version ###
-scriptVersion="1.0.2"
+scriptVersion="1.0.3"
 ######################
 
 echo "[Services Shutdown Script - v"$scriptVersion"]"
@@ -215,7 +215,7 @@ function stopJobProcessor() {
 
 function stopSinclair() {
 	 
-	status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1806/dpsinclair/)
+	status_code=$(curl --write-out %{http_code} -o /dev/null --silent localhost:1806/dpsinclair/login)
 	if [[ "$status_code" -eq 200 ]]; then
 		curl -X POST -o /dev/null --silent localhost:1806/dpsinclair/actuator/shutdown
 	fi
